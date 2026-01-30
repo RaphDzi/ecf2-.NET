@@ -59,21 +59,30 @@ public class LoanService : ILoanService
 
     public async Task<LoanDto> CreateLoanAsync(CreateLoanDto dto, CancellationToken cancellationToken = default)
     {
-        // Vérifier que le livre existe
-        var book = await _catalogClient.GetBookAsync(dto.BookId, cancellationToken);
-        if (book == null)
-            throw new InvalidOperationException($"Book {dto.BookId} not found.");
-
         // Vérifier que l'utilisateur existe
         var user = await _userClient.GetUserAsync(dto.UserId, cancellationToken);
         if (user == null)
             throw new InvalidOperationException($"User {dto.UserId} not found.");
 
-        // Vérifier disponibilité du livre
+        // Vérifier le nombre d'emprunts actifs de l'utilisateur
+        var userLoans = await _repository.GetActiveLoansByUserIdAsync(dto.UserId, cancellationToken);
+        if (userLoans.Count() >= 5)
+            throw new InvalidOperationException($"User {dto.UserId} cannot borrow more than 5 books simultaneously.");
+
+        // Vérifier que le livre existe
+        var book = await _catalogClient.GetBookAsync(dto.BookId, cancellationToken);
+        if (book == null)
+            throw new InvalidOperationException($"Book {dto.BookId} not found.");
+
+        // Vérifier disponibilité du livre (décrémenter le stock)
         var available = await _catalogClient.DecrementAvailabilityAsync(dto.BookId, cancellationToken);
         if (!available)
             throw new InvalidOperationException($"Book {dto.BookId} is not available.");
 
+        // Vérifier que la durée ne dépasse pas 21 jours
+        int duration = Math.Min(dto.DurationDays, 21);
+
+        // Créer le prêt
         var loan = new Loan
         {
             Id = Guid.NewGuid(),
@@ -82,12 +91,20 @@ public class LoanService : ILoanService
             BookTitle = book.Title,
             UserEmail = user.Email,
             LoanDate = DateTime.UtcNow,
-            DueDate = DateTime.UtcNow.AddDays(dto.DurationDays),
+            DueDate = DateTime.UtcNow.AddDays(duration),
             Status = LoanStatus.Active,
             PenaltyAmount = 0
         };
 
-        await _repository.AddAsync(loan, cancellationToken);
+        public decimal CalculatePenalty()
+    {
+        if (ReturnDate == null || ReturnDate <= DueDate) return 0;
+        var daysLate = (ReturnDate.Value - DueDate).Days;
+        return daysLate * 0.50m;
+    }
+
+
+    await _repository.AddAsync(loan, cancellationToken);
         _logger.LogInformation("Loan created: {LoanId} for User {UserId} and Book {BookId}", loan.Id, loan.UserId, loan.BookId);
 
         return MapToDto(loan);
