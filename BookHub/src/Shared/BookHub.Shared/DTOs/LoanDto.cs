@@ -13,10 +13,12 @@ public record LoanDto(
     decimal PenaltyAmount
 );
 
-public record CreateLoanDto(
-    Guid UserId,
-    Guid BookId
-);
+public class CreateLoanDto
+{
+    public Guid UserId { get; set; }
+    public Guid BookId { get; set; }
+    public int DurationDays { get; set; }
+}
 
 public record ReturnLoanDto(
     DateTime ReturnDate
