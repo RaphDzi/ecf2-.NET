@@ -1,12 +1,57 @@
 @page "/books/{Id:guid}"
+@inject HttpClient Http
 
-<PageTitle>Detail du livre - BookHub</PageTitle>
+<PageTitle>Détail du livre - BookHub</PageTitle>
 
-<a href="/books" class="btn btn-secondary">
+<a href="/books" class="btn btn-secondary mb-3">
     <i class="bi bi-arrow-left"></i> Retour au catalogue
 </a>
+
+@if (isLoading)
+{
+    <p>Chargement du livre...</p>
+}
+else if (book is null)
+{
+    <div class="alert alert-danger">
+        Livre introuvable.
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">@book.Title</h3>
+
+            <h6 class="card-subtitle mb-2 text-muted">
+                @book.Author (@book.Year)
+            </h6>
+
+            <p class="card-text mt-3">
+                @book.Description
+            </p>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter]
     public Guid Id { get; set; }
+
+    private BookDto? book;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            book = await Http.GetFromJsonAsync<BookDto>(
+                $"api/books/{Id}"
+            );
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
 }
