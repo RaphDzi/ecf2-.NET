@@ -2,6 +2,21 @@ version: '3.8'
 
 services:
 
+  api-gateway:
+    build:
+      context: ./src/Gateway/BookHub.ApiGateway
+      dockerfile: Dockerfile
+    container_name: bookhub-api-gateway
+    ports:
+      - "5000:80"
+    depends_on:
+      - catalog-service
+      - user-service
+      - loan-service
+    networks:
+      - bookhub-network
+
+  
   postgres:
     image: postgres:16-alpine
     container_name: bookhub-postgres
