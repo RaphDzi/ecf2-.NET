@@ -60,14 +60,19 @@ public class LoanService : ILoanService
     public async Task<LoanDto> CreateLoanAsync(CreateLoanDto dto, CancellationToken cancellationToken = default)
     {
         // Vérifier que le livre existe
-        var book = await _catalogClient.GetBookByIdAsync(dto.BookId, cancellationToken);
+        var book = await _catalogClient.GetBookAsync(dto.BookId, cancellationToken);
         if (book == null)
             throw new InvalidOperationException($"Book {dto.BookId} not found.");
 
         // Vérifier que l'utilisateur existe
-        var user = await _userClient.GetUserByIdAsync(dto.UserId, cancellationToken);
+        var user = await _userClient.GetUserAsync(dto.UserId, cancellationToken);
         if (user == null)
             throw new InvalidOperationException($"User {dto.UserId} not found.");
+
+        // Vérifier disponibilité du livre
+        var available = await _catalogClient.DecrementAvailabilityAsync(dto.BookId, cancellationToken);
+        if (!available)
+            throw new InvalidOperationException($"Book {dto.BookId} is not available.");
 
         var loan = new Loan
         {
@@ -93,16 +98,20 @@ public class LoanService : ILoanService
         var loan = await _repository.GetByIdAsync(id, cancellationToken);
         if (loan == null) return null;
 
+        // Mettre à jour le prêt via l'entité
         loan.ReturnDate = DateTime.UtcNow;
         loan.Status = LoanStatus.Returned;
 
-        // Calculer la pénalité si en retard
         if (loan.DueDate < loan.ReturnDate)
         {
             loan.PenaltyAmount = loan.CalculatePenalty();
         }
 
         await _repository.UpdateAsync(loan, cancellationToken);
+
+        // Rendre le livre disponible
+        await _catalogClient.IncrementAvailabilityAsync(loan.BookId, cancellationToken);
+
         _logger.LogInformation("Loan returned: {LoanId}", loan.Id);
 
         return MapToDto(loan);
