@@ -1,7 +1,6 @@
 using BookHub.CatalogService.Application.Services;
 using BookHub.Shared.DTOs;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace BookHub.CatalogService.Api.Controllers;
 
@@ -24,23 +23,12 @@ public class BooksController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<BookDto?> GetBookByIdAsync(Guid id, CancellationToken ct)
+    public async Task<ActionResult<BookDto>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        Console.WriteLine($"Trying to get book with id {id}");
-
-        var bookEntity = await _context.Books
-            .AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == id, ct);
-
-        if (bookEntity == null)
-        {
-            Console.WriteLine("Book not found in DB");
-            return null;
-        }
-
-        return _mapper.Map<BookDto>(bookEntity);
+        var book = await _bookService.GetBookByIdAsync(id, cancellationToken);
+        if (book == null) return NotFound();
+        return Ok(book);
     }
-
 
     [HttpGet("search")]
     public async Task<ActionResult<IEnumerable<BookDto>>> Search([FromQuery] string term, CancellationToken cancellationToken)
