@@ -22,8 +22,11 @@ public class BookRepository : IBookRepository
 
     public async Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.Books.FindAsync(new object[] { id }, cancellationToken);
+        return await _context.Books
+            .AsNoTracking() // plus sûr pour lecture seule
+            .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
     }
+
 
     public async Task<Book?> GetByIsbnAsync(string isbn, CancellationToken cancellationToken = default)
     {
